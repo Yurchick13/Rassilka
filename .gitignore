@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Environments / secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.toc
+*.pkg
+*.pyz
+*.log
+
+# Virtual environments
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Binary installers and packages
+*.exe
+*.msi
+*.deb
+*.rpm
+*.tar
+*.tar.gz
+*.zip
+*.7z
+
+# Databases / runtime state
+*.db
+*.sqlite
+*.sqlite3
+
+# Large vendor tools
+tools/innosetup/
+tools/nfpm/

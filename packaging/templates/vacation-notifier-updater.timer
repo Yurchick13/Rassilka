@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Vacation Notifier updater periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,150 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | План отпусков</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="plans" data-api-base="{{ api_base }}" data-ws-path="{{ ws_path }}">
+  <main class="page-shell">
+    <header class="app-header">
+      <div class="brand-block">
+        <span class="brand-mark">VR</span>
+        <div>
+          <strong class="brand-title">Реестр отпусков</strong>
+          <p class="brand-subtitle">Планирование и синхронизация отпусков</p>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <a class="button ghost compact" href="/">Форма ввода</a>
+        <a class="button ghost compact" href="/active">Таблица отпусков</a>
+        <a class="button secondary compact" href="/plans">План отпусков</a>
+        <a class="button ghost compact" href="/admin">Админ-панель</a>
+        <a class="button ghost compact" href="/account">Смена пароля</a>
+        <form action="/logout" method="post">
+          <button type="submit" class="button danger compact">Выйти</button>
+        </form>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="hero-kicker">План отпусков</p>
+        <h1>План/факт и ручная синхронизация</h1>
+        <p class="hero-text">
+          Здесь отображаются все записи планирования отпусков. Обычные пользователи видят только актуальные записи
+          по текущей дате в клиентской таблице. Используйте ручную синхронизацию, если нужно немедленно применить
+          изменения плана.
+        </p>
+      </div>
+
+      <div class="hero-cards">
+        <article class="hero-card">
+          <h3>Всего в выборке</h3>
+          <p id="plans-total-count">0</p>
+        </article>
+        <article class="hero-card">
+          <h3>Активно сегодня</h3>
+          <p id="plans-active-count">0</p>
+        </article>
+        <article class="hero-card">
+          <h3>Будущие отпуска</h3>
+          <p id="plans-future-count">0</p>
+        </article>
+        <article class="hero-card">
+          <h3>Последняя синхронизация</h3>
+          <p id="plans-last-sync">—</p>
+        </article>
+      </div>
+
+      <div class="hero-actions">
+        <button id="plans-refresh-btn" type="button" class="button secondary">Обновить данные</button>
+        <button id="plans-export-btn" type="button" class="button secondary">Скачать план Excel</button>
+        <button id="apply-plan-today-btn" type="button" class="button">Применить план на сегодня</button>
+      </div>
+    </section>
+
+    <section class="surface">
+      <div class="table-toolbar">
+        <label class="field search-field">
+          <span class="field-label">ФИО</span>
+          <input id="plans-filter-fio" type="search" placeholder="Например, Иванов" />
+        </label>
+
+        <label class="field search-field">
+          <span class="field-label">Услуга</span>
+          <input id="plans-filter-service" type="search" placeholder="Например, Основной" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Период с</span>
+          <input id="plans-filter-date-from" type="date" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Период по</span>
+          <input id="plans-filter-date-to" type="date" />
+        </label>
+
+        <label class="field plans-checkbox-field">
+          <span class="field-label">Показывать завершенные</span>
+          <input id="plans-filter-include-finished" type="checkbox" checked />
+        </label>
+
+        <button id="plans-apply-filter-btn" type="button" class="button secondary compact">Применить фильтр</button>
+        <button id="plans-reset-filter-btn" type="button" class="button ghost compact">Сбросить</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="plans-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>ФИО</th>
+              <th>Должности</th>
+              <th>Услуга</th>
+              <th>Статус</th>
+              <th>Период</th>
+              <th>Заместители</th>
+              <th>Памятка</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p id="plans-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="surface">
+      <div class="surface-head">
+        <h2>Журнал изменений</h2>
+        <p>Последние операции импорта и синхронизации (добавлено/обновлено/закрыто/удалено).</p>
+      </div>
+
+      <div class="table-wrap">
+        <table id="sync-log-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Тип</th>
+              <th>Источник</th>
+              <th>Пользователь</th>
+              <th>Результат</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p id="sync-log-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=1205" defer></script>
+</body>
+</html>
+

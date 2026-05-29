@@ -1,0 +1,92 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | Клиентский просмотр</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="public" data-api-base="{{ api_base }}" data-ws-path="{{ ws_path }}">
+  <main class="page-shell">
+    <header class="app-header">
+      <div class="brand-block">
+        <span class="brand-mark">VR</span>
+        <div>
+          <strong class="brand-title">Реестр отпусков</strong>
+          <p class="brand-subtitle">Клиентский режим просмотра</p>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a class="button ghost compact" href="/login">Вход для администратора/редактора</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="hero-kicker">Только просмотр</p>
+        <h1>Таблица отпусков</h1>
+        <p class="hero-text">
+          Доступ без учетной записи: можно смотреть текущие и завершенные случаи, а также скачивать Excel.
+          Изменение данных в этом режиме недоступно.
+        </p>
+      </div>
+      <div class="hero-cards">
+        <article class="hero-card">
+          <h3>WebSocket</h3>
+          <p id="public-ws-state">Подключение...</p>
+        </article>
+        <article class="hero-card">
+          <h3>Последнее обновление</h3>
+          <p id="public-last-sync">—</p>
+        </article>
+        <article class="hero-card">
+          <h3>Показано записей</h3>
+          <p id="public-visible-count">0</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="surface">
+      <div class="hero-actions">
+        <button id="public-tab-current" type="button" class="button secondary">Текущие</button>
+        <button id="public-tab-finished" type="button" class="button ghost">Завершенные</button>
+        <button id="public-refresh" type="button" class="button secondary">Обновить</button>
+        <a id="public-export-link" class="button" href="/api/public/vacations/export?tab=current">Скачать Excel</a>
+      </div>
+
+      <div class="table-toolbar">
+        <label class="field search-field">
+          <span class="field-label">Поиск по таблице</span>
+          <input id="public-search" type="search" placeholder="ФИО, должность, услуга, заместитель, памятка" />
+        </label>
+        <button id="public-search-reset" type="button" class="button ghost compact">Сбросить фильтр</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="public-table">
+          <thead>
+            <tr>
+              <th>ФИО</th>
+              <th>Должности</th>
+              <th>Статус</th>
+              <th>Услуга</th>
+              <th>Заместители</th>
+              <th>Период</th>
+              <th>Памятка</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p id="public-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=1205" defer></script>
+</body>
+</html>
+
+
+
+

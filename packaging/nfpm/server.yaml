@@ -1,0 +1,36 @@
+name: vacation-registry-server
+arch: amd64
+platform: linux
+version: 1.0.0
+section: utils
+priority: optional
+maintainer: HR IT <hr-it@example.com>
+description: Vacation registry backend service (FastAPI)
+vendor: Internal
+homepage: https://localhost
+license: Proprietary
+
+contents:
+  - src: ./dist/staging/server/opt/vacation-registry/
+    dst: /opt/vacation-registry
+    type: tree
+  - src: ./dist/staging/server/etc/systemd/system/vacation-registry.service
+    dst: /etc/systemd/system/vacation-registry.service
+
+scripts:
+  postinstall: ./packaging/nfpm/scripts/server-postinstall.sh
+  preremove: ./packaging/nfpm/scripts/server-preremove.sh
+  postremove: ./packaging/nfpm/scripts/server-postremove.sh
+
+overrides:
+  deb:
+    depends:
+      - python3
+      - python3-venv
+      - python3-pip
+      - systemd
+  rpm:
+    depends:
+      - python3
+      - python3-pip
+      - systemd

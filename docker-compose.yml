@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: vacations
+      POSTGRES_USER: vacations
+      POSTGRES_PASSWORD: vacations
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      APP_TIMEZONE: Europe/Moscow
+      DATABASE_URL: postgresql+psycopg://vacations:vacations@db:5432/vacations
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

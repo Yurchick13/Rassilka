@@ -1,0 +1,55 @@
+name: vacation-registry-notifier
+arch: amd64
+platform: linux
+version: 1.0.0
+section: utils
+priority: optional
+maintainer: HR IT <hr-it@example.com>
+description: Desktop notifier for vacation registry updates
+vendor: Internal
+homepage: https://localhost
+license: Proprietary
+
+contents:
+  - src: ./dist/staging/notifier/opt/vacation-notifier/
+    dst: /opt/vacation-notifier
+    type: tree
+  - src: ./dist/staging/notifier/usr/bin/vacation-notifier
+    dst: /usr/bin/vacation-notifier
+    file_info:
+      mode: 0755
+  - src: ./dist/staging/notifier/usr/lib/systemd/user/redos-notifier.service
+    dst: /usr/lib/systemd/user/redos-notifier.service
+  - src: ./dist/staging/notifier/usr/libexec/vacation-notifier-updater
+    dst: /usr/libexec/vacation-notifier-updater
+    file_info:
+      mode: 0755
+  - src: ./dist/staging/notifier/usr/lib/systemd/system/vacation-notifier-updater.service
+    dst: /usr/lib/systemd/system/vacation-notifier-updater.service
+  - src: ./dist/staging/notifier/usr/lib/systemd/system/vacation-notifier-updater.timer
+    dst: /usr/lib/systemd/system/vacation-notifier-updater.timer
+  - src: ./dist/staging/notifier/usr/share/applications/vacation-notifier.desktop
+    dst: /usr/share/applications/vacation-notifier.desktop
+  - src: ./dist/staging/notifier/etc/xdg/autostart/vacation-notifier.desktop
+    dst: /etc/xdg/autostart/vacation-notifier.desktop
+  - src: ./dist/staging/notifier/etc/vacation-notifier.env.example
+    dst: /etc/vacation-notifier.env.example
+
+scripts:
+  postinstall: ./packaging/nfpm/scripts/notifier-postinstall.sh
+  postremove: ./packaging/nfpm/scripts/notifier-postremove.sh
+
+overrides:
+  deb:
+    depends:
+      - python3
+      - python3-venv
+      - python3-pip
+      - python3-tk
+      - libnotify-bin
+  rpm:
+    depends:
+      - python3
+      - python3-pip
+      - python3-tkinter
+      - libnotify

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Vacation Notifier
+Comment=Vacation registry notifications client
+Exec=/usr/bin/vacation-notifier
+Terminal=false
+Type=Application
+Categories=Office;

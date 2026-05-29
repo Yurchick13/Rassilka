@@ -1,0 +1,15 @@
+[Unit]
+Description=Vacation Registry API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vacation-registry
+Environment=APP_TIMEZONE=Europe/Moscow
+Environment=DATABASE_URL=sqlite:///./vacations.db
+ExecStart=/opt/vacation-registry/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

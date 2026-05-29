@@ -1,0 +1,63 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | Вход</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="login">
+  <main class="auth-shell">
+    <section class="auth-card wide">
+      <div class="auth-header">
+        <span class="brand-mark">VR</span>
+        <div>
+          <h1>Реестр отпусков</h1>
+          <p class="auth-subtitle">Авторизация для работы с кадровыми данными</p>
+        </div>
+      </div>
+
+      <div class="auth-grid">
+        <div class="auth-info">
+          <h2>Что доступно в системе</h2>
+          <ul class="explain-list">
+            <li><strong>Администратор:</strong> добавление, изменение, завершение отпусков, управление пользователями.</li>
+            <li><strong>Редактор:</strong> добавление и редактирование записей в таблице отпусков.</li>
+            <li><strong>Клиент:</strong> просмотр текущих и завершенных отпусков, выгрузка Excel.</li>
+            <li>Уведомления о любом изменении реестра отправляются клиентским приложениям.</li>
+          </ul>
+        </div>
+
+        <form action="/login" method="post" class="auth-form">
+          <label class="field">
+            <span class="field-label">Логин</span>
+            <input name="username" required minlength="3" maxlength="64" autocomplete="username" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Пароль</span>
+            <input
+              type="password"
+              name="password"
+              required
+              minlength="8"
+              maxlength="128"
+              autocomplete="current-password"
+            />
+          </label>
+
+          <button type="submit" class="button auth-submit">Войти</button>
+
+          {% if error_text %}
+          <p class="status-message status-error">{{ error_text }}</p>
+          {% endif %}
+        </form>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+
+
+
+

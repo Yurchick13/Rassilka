@@ -1,0 +1,328 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | Админ-панель</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="admin" data-api-base="/api">
+  <main class="page-shell">
+    <header class="app-header">
+      <div class="brand-block">
+        <span class="brand-mark">VR</span>
+        <div>
+          <strong class="brand-title">Реестр отпусков</strong>
+          <p class="brand-subtitle">Управление учетными записями</p>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <a class="button ghost compact" href="/">Форма ввода</a>
+        <a class="button ghost compact" href="/active">Таблица отпусков</a>
+        <a class="button ghost compact" href="/plans">План отпусков</a>
+        <a class="button secondary compact" href="/admin">Админ-панель</a>
+        <a class="button ghost compact" href="/account">Смена пароля</a>
+        <form action="/logout" method="post">
+          <button type="submit" class="button danger compact">Выйти</button>
+        </form>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="hero-kicker">Администрирование доступа</p>
+        <h1>Пользователи системы</h1>
+        <p class="hero-text">
+          Здесь создаются учетные записи с ролями. Администратор управляет пользователями и паролями,
+          редактор изменяет реестр, клиент работает только с просмотром и выгрузкой.
+        </p>
+      </div>
+      <div class="hero-cards">
+        <article class="hero-card">
+          <h3>Текущий пользователь</h3>
+          <p>{{ current_user.username }}</p>
+        </article>
+        <article class="hero-card">
+          <h3>Роль</h3>
+          <p>Администратор</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="layout-grid admin-layout">
+      <article class="surface">
+        <h2>Создать пользователя</h2>
+        <form action="/admin/users" method="post" class="vacation-form">
+          <label class="field">
+            <span class="field-label">Логин</span>
+            <input name="username" required minlength="3" maxlength="64" autocomplete="off" />
+            <small class="field-help">Только уникальный логин. Регистр не учитывается.</small>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Пароль</span>
+            <input type="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password" />
+            <small class="field-help">Минимум 8 символов.</small>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Роль</span>
+            <select name="role">
+              <option value="admin">Администратор</option>
+              <option value="editor">Редактор</option>
+              <option value="client">Клиент</option>
+            </select>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" class="button">Создать пользователя</button>
+          </div>
+        </form>
+
+        {% if error_text %}
+        <p class="status-message status-error">{{ error_text }}</p>
+        {% endif %}
+        {% if success_text %}
+        <p class="status-message status-success">{{ success_text }}</p>
+        {% endif %}
+      </article>
+
+      <article class="surface">
+        <h2>Повтор уведомлений</h2>
+        <form action="/admin/notification-config" method="post" class="vacation-form">
+          <label class="field">
+            <span class="field-label">Интервал повтора (минуты)</span>
+            <input
+              type="number"
+              name="repeat_interval_minutes"
+              min="0"
+              max="{{ notification_repeat_interval_max }}"
+              value="{{ notification_repeat_interval_minutes }}"
+              required
+            />
+            <small class="field-help">
+              0 — повтор отключен. При значении больше 0 клиентское приложение будет повторно показывать последнее уведомление через указанный интервал.
+            </small>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" class="button">Сохранить интервал</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="surface">
+        <h2>Автообновление клиентов</h2>
+        <form action="/admin/client-update-config" method="post" class="vacation-form">
+          <input type="hidden" name="enabled" value="0" />
+          <label class="field checkbox-field">
+            <input
+              type="checkbox"
+              name="enabled"
+              value="1"
+              {% if client_update_config.enabled %}checked{% endif %}
+            />
+            <span>Включить автообновления клиентов</span>
+          </label>
+
+          <div class="field-grid two-col">
+            <label class="field">
+              <span class="field-label">Актуальная версия клиента</span>
+              <input
+                type="text"
+                name="latest_version"
+                value="{{ client_update_config.latest_version }}"
+                required
+                placeholder="Например, 1.2.0"
+              />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Проверка обновлений (минуты)</span>
+              <input
+                type="number"
+                name="check_interval_minutes"
+                min="5"
+                max="1440"
+                value="{{ client_update_config.check_interval_minutes }}"
+                required
+              />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field-label">Windows EXE URL</span>
+            <input
+              type="url"
+              name="windows_installer_url"
+              value="{{ client_update_config.windows_installer_url or '' }}"
+              placeholder="http://192.168.76.95:8000/static/updates/vacation-notifier-setup.exe"
+            />
+          </label>
+
+          <div class="field-grid two-col">
+            <label class="field">
+              <span class="field-label">Linux DEB URL</span>
+              <input
+                type="url"
+                name="linux_deb_url"
+                value="{{ client_update_config.linux_deb_url or '' }}"
+                placeholder="http://192.168.76.95:8000/static/updates/vacation-registry-notifier_latest_amd64.deb"
+              />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Linux RPM URL</span>
+              <input
+                type="url"
+                name="linux_rpm_url"
+                value="{{ client_update_config.linux_rpm_url or '' }}"
+                placeholder="http://192.168.76.95:8000/static/updates/vacation-registry-notifier-latest.x86_64.rpm"
+              />
+            </label>
+          </div>
+
+          <small class="field-help">
+            Клиенты сверяют версию с манифестом и скачивают файл из <code>update_url</code>. Если URL оставить пустыми, сервер автоматически подставляет пути из <code>/static/updates</code>.
+          </small>
+
+          <div class="form-actions">
+            <button type="submit" class="button">Сохранить настройки обновлений</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="surface">
+        <div class="surface-head">
+          <h2>Монитор версий клиентов</h2>
+          <p>Онлайн-статус, текущая версия, состояние обновления и последняя активность каждого клиента.</p>
+        </div>
+
+        <div class="hero-actions">
+          <button id="admin-clients-refresh-btn" type="button" class="button secondary compact">Обновить монитор</button>
+        </div>
+
+        <div class="table-wrap">
+          <table id="admin-clients-table">
+            <thead>
+              <tr>
+                <th>Client ID</th>
+                <th>Хост</th>
+                <th>Пользователь</th>
+                <th>ОС</th>
+                <th>Версия</th>
+                <th>Статус</th>
+                <th>Обновление</th>
+                <th>Последняя активность</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in client_monitor_rows %}
+              <tr>
+                <td>{{ row.client_id }}</td>
+                <td>{{ row.hostname or '—' }}</td>
+                <td>{{ row.username or '—' }}</td>
+                <td>{{ (row.os_name or '—') ~ ' ' ~ (row.os_version or '') }}</td>
+                <td>
+                  {{ row.app_version or 'unknown' }}
+                  {% if row.is_outdated %}
+                  <span class="chip chip-editor">Устарела</span>
+                  {% else %}
+                  <span class="chip chip-client">Актуальна</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.is_online %}
+                  <span class="chip chip-client">Онлайн</span>
+                  {% else %}
+                  <span class="chip chip-editor">Офлайн</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ row.update_status or '—' }}
+                  {% if row.update_error %}
+                  <br><small>{{ row.update_error }}</small>
+                  {% endif %}
+                </td>
+                <td>{{ row.last_seen_at }}</td>
+                <td>{{ row.ip_address or '—' }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="9" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p id="admin-clients-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+      </article>
+
+      <article class="surface">
+        <h2>Список пользователей</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Логин</th>
+                <th>Роль</th>
+                <th>Активен</th>
+                <th>Создан</th>
+                <th>Сброс пароля</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+              <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>
+                  <span class="chip {{
+                    'chip-admin' if user.role.value == 'admin'
+                    else 'chip-editor' if user.role.value == 'editor'
+                    else 'chip-client'
+                  }}">
+                    {{
+                      'администратор' if user.role.value == 'admin'
+                      else 'редактор' if user.role.value == 'editor'
+                      else 'клиент'
+                    }}
+                  </span>
+                </td>
+                <td>{{ 'да' if user.is_active else 'нет' }}</td>
+                <td>{{ user.created_at }}</td>
+                <td>
+                  <form action="/admin/users/{{ user.id }}/password" method="post" class="inline-form">
+                    <input
+                      type="password"
+                      name="new_password"
+                      minlength="8"
+                      maxlength="128"
+                      required
+                      placeholder="Новый пароль"
+                    />
+                    <button type="submit" class="button compact secondary">Сохранить</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="empty-cell">Пользователей пока нет.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="/static/app.js?v=1205" defer></script>
+</body>
+</html>
+
+
+
+

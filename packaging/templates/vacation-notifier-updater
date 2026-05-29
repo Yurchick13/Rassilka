@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="/etc/vacation-notifier.env"
+SERVER_HTTP_URL="http://192.168.76.95:8000"
+CLIENT_HEARTBEAT_TOKEN=""
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+if command -v rpm >/dev/null 2>&1; then
+  PLATFORM="linux-rpm"
+elif command -v dpkg >/dev/null 2>&1; then
+  PLATFORM="linux-deb"
+else
+  PLATFORM="linux"
+fi
+
+CURRENT_VERSION="0.0.0"
+for candidate in \
+  /opt/vacation-notifier/redos_notifier/VERSION \
+  /opt/vacation-notifier/VERSION
+  do
+  if [[ -f "$candidate" ]]; then
+    value="$(tr -d '\r\n' < "$candidate" || true)"
+    if [[ -n "$value" ]]; then
+      CURRENT_VERSION="$value"
+      break
+    fi
+  fi
+done
+
+readarray -t UPDATE_INFO < <(python3 - "$SERVER_HTTP_URL" "$PLATFORM" "$CURRENT_VERSION" "$CLIENT_HEARTBEAT_TOKEN" <<'PY'
+import json
+import sys
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+server_http_url = (sys.argv[1] or '').rstrip('/')
+platform = sys.argv[2] or 'linux'
+current_version = (sys.argv[3] or '0.0.0').strip()
+token = (sys.argv[4] or '').strip()
+
+
+def split_parts(version: str):
+    token_value = (version or '').strip().lower().lstrip('v')
+    if not token_value:
+        return [(0, '')]
+    parts = []
+    for chunk in token_value.replace('-', '.').split('.'):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        digits = ''.join(ch for ch in chunk if ch.isdigit())
+        letters = ''.join(ch for ch in chunk if ch.isalpha())
+        if digits:
+            parts.append((int(digits), letters))
+        else:
+            parts.append((0, letters))
+    return parts or [(0, '')]
+
+
+def is_newer(candidate: str, current: str) -> bool:
+    return split_parts(candidate) > split_parts(current)
+
+query = urlencode({'platform': platform})
+url = f"{server_http_url}/api/client-update-manifest?{query}"
+headers = {'Accept': 'application/json', 'User-Agent': f'vacation-notifier-updater/{current_version}'}
+if token:
+    headers['X-Client-Token'] = token
+
+try:
+    req = Request(url, headers=headers)
+    with urlopen(req, timeout=20) as response:
+        payload = json.loads(response.read().decode('utf-8'))
+except Exception:
+    sys.exit(0)
+
+if not isinstance(payload, dict):
+    sys.exit(0)
+if not bool(payload.get('enabled', False)):
+    sys.exit(0)
+latest = str(payload.get('latest_version', '')).strip()
+update_url = str(payload.get('update_url', '')).strip()
+if not latest or not update_url:
+    sys.exit(0)
+if not is_newer(latest, current_version):
+    sys.exit(0)
+print(update_url)
+print(latest)
+PY
+)
+
+UPDATE_URL="${UPDATE_INFO[0]:-}"
+TARGET_VERSION="${UPDATE_INFO[1]:-}"
+
+if [[ -z "$UPDATE_URL" || -z "$TARGET_VERSION" ]]; then
+  exit 0
+fi
+
+TMP_FILE="$(mktemp /tmp/vacation-notifier-update.XXXXXX)"
+cleanup() {
+  rm -f "$TMP_FILE" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+python3 - "$UPDATE_URL" "$TMP_FILE" <<'PY'
+import sys
+from urllib.request import Request, urlopen
+
+url = sys.argv[1]
+out_file = sys.argv[2]
+req = Request(url, headers={'User-Agent': 'vacation-notifier-updater'})
+with urlopen(req, timeout=120) as response:
+    data = response.read()
+with open(out_file, 'wb') as fh:
+    fh.write(data)
+PY
+
+if [[ "$UPDATE_URL" == *.rpm ]]; then
+  rpm -Uvh --replacepkgs "$TMP_FILE"
+elif [[ "$UPDATE_URL" == *.deb ]]; then
+  dpkg -i "$TMP_FILE"
+else
+  exit 0
+fi
+
+echo "$(date -Is) updated notifier to ${TARGET_VERSION} from ${UPDATE_URL}" >> /var/log/vacation-notifier-updater.log

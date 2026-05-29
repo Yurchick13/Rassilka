@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+set -a
+if [[ -f /etc/vacation-notifier.env ]]; then
+  source /etc/vacation-notifier.env
+else
+  SERVER_HTTP_URL="http://192.168.76.95:8000"
+  SERVER_WS_URL="ws://192.168.76.95:8000/ws/registry"
+fi
+set +a
+exec /opt/vacation-notifier/.venv/bin/python /opt/vacation-notifier/redos_notifier/notifier.py

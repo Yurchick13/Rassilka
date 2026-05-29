@@ -1,0 +1,225 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | Форма внесения</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="index" data-api-base="{{ api_base }}" data-ws-path="{{ ws_path }}">
+  <main class="page-shell">
+    <header class="app-header">
+      <div class="brand-block">
+        <span class="brand-mark">VR</span>
+        <div>
+          <strong class="brand-title">Реестр отпусков</strong>
+          <p class="brand-subtitle">Кадровый портал уведомлений</p>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <a class="button secondary compact" href="/">Форма ввода</a>
+        <a class="button ghost compact" href="/active">Таблица отпусков</a>
+        {% if is_admin %}
+        <a class="button ghost compact" href="/plans">План отпусков</a>
+        <a class="button ghost compact" href="/admin">Админ-панель</a>
+        <a class="button ghost compact" href="/account">Смена пароля</a>
+        {% endif %}
+        <form action="/logout" method="post">
+          <button type="submit" class="button danger compact">Выйти</button>
+        </form>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="hero-kicker">Рабочее место пользователя с правом редактирования</p>
+        <h1>Добавление сотрудника в реестр отпусков</h1>
+        <p class="hero-text">
+          После сохранения карточки запись попадает в базу данных, а клиентские приложения получают уведомление
+          об обновлении реестра. Все поля ниже обязательны к корректному заполнению.
+        </p>
+      </div>
+      <div class="hero-cards">
+        <article class="hero-card">
+          <h3>Пользователь</h3>
+          <p>{{ current_user.username }}</p>
+        </article>
+        <article class="hero-card">
+          <h3>Роль</h3>
+          <p>{{ role_label }}</p>
+        </article>
+        <article class="hero-card">
+          <h3>Действие</h3>
+          <p>{{ 'Полное управление системой' if is_admin else 'Создание и редактирование записей' }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="layout-grid">
+      <article class="surface surface-form">
+        <div class="surface-head">
+          <h2>Новая запись</h2>
+          <p>Заполните все поля. Для нескольких должностей укажите отдельного заместителя на каждую из них.</p>
+        </div>
+
+        <form id="vacation-form" class="vacation-form">
+          <fieldset class="form-block">
+            <legend>Сотрудник и услуга</legend>
+            <div class="field-grid two-col">
+              <label class="field">
+                <span class="field-label">ФИО сотрудника</span>
+                <input name="employee_full_name" required placeholder="Иванов Иван Иванович" />
+                <span class="checkbox-field">
+                  <input type="checkbox" name="is_special_employee" />
+                  <span>Особый сотрудник</span>
+                </span>
+                <small class="field-help">{{ field_help.employee_full_name }}</small>
+              </label>
+
+              <label class="field">
+                <span class="field-label">Услуга</span>
+                <input name="service" required placeholder="Кадровое сопровождение" />
+                <small class="field-help">{{ field_help.service }}</small>
+              </label>
+            </div>
+
+            <div class="field-grid two-col">
+              <label class="field">
+                <span class="field-label">Статус</span>
+                <select name="status" required>
+                  <option value="В отпуске">В отпуске</option>
+                  <option value="Больничный лист">Больничный лист</option>
+                  <option value="Завершен">Завершен</option>
+                </select>
+                <small class="field-help">{{ field_help.status }}</small>
+              </label>
+
+              <label class="field">
+                <span class="field-label">Должность/должности (по одной на строку)</span>
+                <textarea
+                  name="employee_positions"
+                  rows="4"
+                  required
+                  placeholder="Начальник отдела&#10;Эксперт"
+                ></textarea>
+                <small class="field-help">{{ field_help.employee_positions }}</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-block">
+            <legend>Период отпуска</legend>
+            <div class="field-grid two-col">
+              <label class="field">
+                <span class="field-label">Дата начала отпуска</span>
+                <input type="date" name="start_date" required />
+                <small class="field-help">{{ field_help.start_date }}</small>
+              </label>
+
+              <label class="field">
+                <span class="field-label">Дата окончания отпуска</span>
+                <input type="date" name="end_date" required />
+                <small class="field-help">{{ field_help.end_date }}</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-block">
+            <legend>Замещение по должностям</legend>
+            <div class="subsection-head">
+              <p class="hint">{{ field_help.deputies }}</p>
+              <button type="button" id="add-deputy" class="button secondary compact">Добавить заместителя</button>
+            </div>
+            <div id="deputies-list" class="deputies-list"></div>
+          </fieldset>
+
+          <fieldset class="form-block">
+            <legend>Памятка для коллег</legend>
+            <label class="field">
+              <span class="field-label">Памятка</span>
+              <textarea
+                name="memo"
+                rows="4"
+                placeholder="Что не нужно делать за сотрудника и важные комментарии на период отпуска"
+              ></textarea>
+              <small class="field-help">{{ field_help.memo }}</small>
+            </label>
+          </fieldset>
+
+          <div class="form-actions">
+            <button id="save-vacation-btn" type="submit" class="button">Сохранить запись</button>
+            <button id="reset-vacation-form" type="button" class="button ghost">Очистить форму</button>
+          </div>
+        </form>
+
+        <p id="form-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+      </article>
+
+      <aside class="surface surface-aside">
+        <h2>Пояснения по заполнению</h2>
+        <ul class="explain-list">
+          <li><strong>ФИО сотрудника:</strong> {{ field_help.employee_full_name }}</li>
+          <li><strong>Особый сотрудник:</strong> {{ field_help.is_special_employee }}</li>
+          <li><strong>Должность/должности:</strong> {{ field_help.employee_positions }}</li>
+          <li><strong>Статус:</strong> {{ field_help.status }}</li>
+          <li><strong>Услуга:</strong> {{ field_help.service }}</li>
+          <li><strong>Заместители:</strong> {{ field_help.deputies }}</li>
+          <li><strong>Дата начала:</strong> {{ field_help.start_date }}</li>
+          <li><strong>Дата окончания:</strong> {{ field_help.end_date }}</li>
+          <li><strong>Памятка:</strong> {{ field_help.memo }}</li>
+        </ul>
+
+        <section class="form-block import-block">
+          <h3>Импорт из Excel</h3>
+          <p class="hint">
+            Поддерживаются шаблон реестра и кадровая таблица планирования отпусков. Будущие отпуска сохраняются в БД,
+            но в клиентской таблице показываются только с даты начала. При повторной загрузке данные по сотруднику
+            синхронизируются (учитываются переносы, разделение отпусков и досрочное завершение).
+          </p>
+          <form id="excel-import-form" class="vacation-form">
+            <label class="field">
+              <span class="field-label">Файл Excel</span>
+              <input id="excel-import-file" name="excel_file" type="file" accept=".xlsx" required />
+            </label>
+            <div class="form-actions">
+              <button id="import-excel-btn" type="submit" class="button secondary">Загрузить в реестр</button>
+            </div>
+          </form>
+          <p id="import-message" class="status-message status-muted" role="status" aria-live="polite"></p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <template id="deputy-row-template">
+    <div class="deputy-row">
+      <div class="field-grid three-col">
+        <label class="field">
+          <span class="field-label">Должность в отпуске</span>
+          <input name="vacation_position" required placeholder="Начальник отдела" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Заместитель (ФИО)</span>
+          <input name="deputy_full_name" required placeholder="Петров Петр Петрович" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Фактическая должность заместителя</span>
+          <input name="deputy_actual_position" required placeholder="Ведущий специалист" />
+        </label>
+      </div>
+      <div class="deputy-actions">
+        <button type="button" class="button danger compact remove-deputy">Удалить</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="/static/app.js?v=1205" defer></script>
+</body>
+</html>
+
+
+
+

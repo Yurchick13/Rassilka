@@ -1,0 +1,87 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Реестр отпусков | Смена пароля</title>
+  <link rel="stylesheet" href="/static/style.css?v=1205" />
+</head>
+<body data-page="account">
+  <main class="page-shell">
+    <header class="app-header">
+      <div class="brand-block">
+        <span class="brand-mark">VR</span>
+        <div>
+          <strong class="brand-title">Реестр отпусков</strong>
+          <p class="brand-subtitle">Безопасность учетной записи</p>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <a class="button ghost compact" href="/">Форма ввода</a>
+        <a class="button ghost compact" href="/active">Таблица отпусков</a>
+        <a class="button ghost compact" href="/plans">План отпусков</a>
+        <a class="button ghost compact" href="/admin">Админ-панель</a>
+        <a class="button secondary compact" href="/account">Смена пароля</a>
+        <form action="/logout" method="post">
+          <button type="submit" class="button danger compact">Выйти</button>
+        </form>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="hero-kicker">Профиль пользователя</p>
+        <h1>Смена пароля</h1>
+        <p class="hero-text">
+          Измените пароль своей учетной записи. Используйте новый пароль, который не совпадает с текущим.
+        </p>
+      </div>
+      <div class="hero-cards">
+        <article class="hero-card">
+          <h3>Пользователь</h3>
+          <p>{{ current_user.username }}</p>
+        </article>
+        <article class="hero-card">
+          <h3>Роль</h3>
+          <p>{{ role_label }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="surface account-surface">
+      <form action="/account/password" method="post" class="vacation-form account-form">
+        <label class="field">
+          <span class="field-label">Текущий пароль</span>
+          <input type="password" name="current_password" minlength="8" maxlength="128" required autocomplete="current-password" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Новый пароль</span>
+          <input type="password" name="new_password" minlength="8" maxlength="128" required autocomplete="new-password" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Подтверждение нового пароля</span>
+          <input type="password" name="new_password_confirm" minlength="8" maxlength="128" required autocomplete="new-password" />
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" class="button">Сменить пароль</button>
+        </div>
+      </form>
+
+      {% if error_text %}
+      <p class="status-message status-error">{{ error_text }}</p>
+      {% endif %}
+      {% if success_text %}
+      <p class="status-message status-success">{{ success_text }}</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
+
+
+
+
