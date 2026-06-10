@@ -953,6 +953,8 @@ async def lifespan(_: FastAPI):
         ensure_default_admin(db)
         _ensure_notification_config(db)
         _ensure_client_update_config(db)
+        _cleanup_client_heartbeat_duplicates(db)
+    _ensure_client_heartbeat_unique_indexes()
 
     await _run_cleanup_and_notify()
 
@@ -1431,14 +1433,41 @@ def _normalize_mac_address(value: str | None) -> str:
     return ":".join(raw[index : index + 2] for index in range(0, 12, 2))
 
 
+def _normalize_client_hostname(value: str | None) -> str:
+    hostname = _normalize_text(value).lower().strip(".")
+    if not hostname or hostname in {"localhost", "localhost.localdomain", "unknown-host"}:
+        return ""
+    # Linux clients often report FQDN values like pc01224-1.localdomain.
+    # For device identity we only need the stable host name, not the domain.
+    return hostname.split(".", 1)[0]
+
+
 def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeartbeatUpsert) -> ClientHeartbeat:
     ip_address = _resolve_client_ip(request, payload.ip_address)
     mac_address = _normalize_mac_address(payload.mac_address)
+    normalized_hostname = _normalize_client_hostname(payload.hostname)
     now_utc = datetime.now(timezone.utc)
     heartbeat = None
 
     if mac_address:
         heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.mac_address == mac_address))
+    if not heartbeat and normalized_hostname:
+        heartbeat = db.scalar(
+            select(ClientHeartbeat)
+            .where(
+                or_(
+                    func.lower(ClientHeartbeat.hostname) == normalized_hostname,
+                    func.lower(ClientHeartbeat.hostname).like(f"{normalized_hostname}.%"),
+                )
+            )
+            .order_by(ClientHeartbeat.last_seen_at.desc(), ClientHeartbeat.id.desc())
+        )
+    if not heartbeat and ip_address:
+        heartbeat = db.scalar(
+            select(ClientHeartbeat)
+            .where(ClientHeartbeat.ip_address == ip_address)
+            .order_by(ClientHeartbeat.last_seen_at.desc(), ClientHeartbeat.id.desc())
+        )
     if not heartbeat:
         heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.client_id == payload.client_id))
 
@@ -1479,12 +1508,21 @@ def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeart
     duplicate_filters = []
     if mac_address:
         duplicate_filters.append(ClientHeartbeat.mac_address == mac_address)
-    normalized_hostname = _normalize_text(payload.hostname)
-    if mac_address and normalized_hostname:
+    if normalized_hostname:
         duplicate_filters.append(
             and_(
-                ClientHeartbeat.mac_address.is_(None),
-                func.lower(ClientHeartbeat.hostname) == normalized_hostname.lower(),
+                or_(ClientHeartbeat.mac_address.is_(None), ClientHeartbeat.mac_address == ""),
+                or_(
+                    func.lower(ClientHeartbeat.hostname) == normalized_hostname,
+                    func.lower(ClientHeartbeat.hostname).like(f"{normalized_hostname}.%"),
+                ),
+            )
+        )
+    if ip_address:
+        duplicate_filters.append(
+            and_(
+                or_(ClientHeartbeat.mac_address.is_(None), ClientHeartbeat.mac_address == ""),
+                ClientHeartbeat.ip_address == ip_address,
             )
         )
     if duplicate_filters:
@@ -1510,22 +1548,86 @@ def _normalize_dt_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
+def _mac_from_client_id(value: str | None) -> str:
+    text_value = _normalize_text(value).lower()
+    if not text_value.startswith("mac-"):
+        return ""
+    return _normalize_mac_address(text_value.removeprefix("mac-"))
+
+
+def _client_heartbeat_identity(row: ClientHeartbeat) -> str:
+    mac_address = _normalize_mac_address(row.mac_address) or _mac_from_client_id(row.client_id)
+    if mac_address:
+        return f"mac:{mac_address}"
+    hostname = _normalize_client_hostname(row.hostname)
+    if hostname:
+        return f"host:{hostname}"
+    ip_address = _normalize_text(row.ip_address)
+    if ip_address:
+        return f"ip:{ip_address}"
+    return f"id:{row.client_id}"
+
+
+def _cleanup_client_heartbeat_duplicates(db: Session) -> int:
+    rows = db.scalars(
+        select(ClientHeartbeat).order_by(ClientHeartbeat.last_seen_at.desc(), ClientHeartbeat.id.desc())
+    ).all()
+    seen: set[str] = set()
+    seen_ip_without_mac: set[str] = set()
+    deleted_count = 0
+    changed = False
+
+    for row in rows:
+        mac_address = _normalize_mac_address(row.mac_address) or _mac_from_client_id(row.client_id)
+        if mac_address and row.mac_address != mac_address:
+            row.mac_address = mac_address
+            changed = True
+        identity = _client_heartbeat_identity(row)
+        if identity in seen:
+            db.delete(row)
+            deleted_count += 1
+            changed = True
+            continue
+        seen.add(identity)
+        ip_address = _normalize_text(row.ip_address)
+        if not mac_address and ip_address:
+            if ip_address in seen_ip_without_mac:
+                db.delete(row)
+                deleted_count += 1
+                changed = True
+                continue
+            seen_ip_without_mac.add(ip_address)
+
+    if changed:
+        db.commit()
+    return deleted_count
+
+
+def _ensure_client_heartbeat_unique_indexes() -> None:
+    where_clause = "mac_address IS NOT NULL AND mac_address <> ''"
+    with engine.begin() as conn:
+        try:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_client_heartbeats_mac_address "
+                    f"ON client_heartbeats (mac_address) WHERE {where_clause}"
+                )
+            )
+        except Exception:
+            pass
+
+
 def _build_client_monitor_rows(db: Session, *, latest_version: str) -> list[ClientHeartbeatMonitorResponse]:
     now_utc = datetime.now(timezone.utc)
     online_delta_seconds = max(30, CLIENT_ONLINE_WINDOW_SECONDS)
+    _cleanup_client_heartbeat_duplicates(db)
     rows = db.scalars(select(ClientHeartbeat).order_by(ClientHeartbeat.last_seen_at.desc(), ClientHeartbeat.id.desc())).all()
 
     result: list[ClientHeartbeatMonitorResponse] = []
     seen_fingerprints: set[str] = set()
     for row in rows:
-        mac_address = _normalize_mac_address(row.mac_address)
-        hostname = _normalize_text(row.hostname).lower()
-        if mac_address:
-            fingerprint = f"mac:{mac_address}"
-        elif hostname:
-            fingerprint = f"host:{hostname}"
-        else:
-            fingerprint = f"id:{row.client_id}"
+        mac_address = _normalize_mac_address(row.mac_address) or _mac_from_client_id(row.client_id)
+        fingerprint = _client_heartbeat_identity(row)
         if fingerprint in seen_fingerprints:
             continue
         seen_fingerprints.add(fingerprint)
