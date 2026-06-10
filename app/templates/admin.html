@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Реестр отпусков | Админ-панель</title>
-  <link rel="stylesheet" href="/static/style.css?v=1205" />
+  <link rel="stylesheet" href="/static/style.css?v=1207" />
 </head>
 <body data-page="admin" data-api-base="/api">
   <main class="page-shell">
@@ -203,6 +203,25 @@
           <button id="admin-clients-refresh-btn" type="button" class="button secondary compact">Обновить монитор</button>
         </div>
 
+        <div class="client-monitor-summary" aria-label="Сводка клиентов уведомлений">
+          <div class="client-monitor-card">
+            <span>Всего устройств</span>
+            <strong id="admin-clients-total">{{ client_monitor_rows|length }}</strong>
+          </div>
+          <div class="client-monitor-card">
+            <span>Установлены уведомления</span>
+            <strong id="admin-clients-installed">{{ client_monitor_rows|length }}</strong>
+          </div>
+          <div class="client-monitor-card">
+            <span>Онлайн</span>
+            <strong id="admin-clients-online">{{ client_monitor_rows|selectattr('is_online')|list|length }}</strong>
+          </div>
+          <div class="client-monitor-card">
+            <span>Устарели</span>
+            <strong id="admin-clients-outdated">{{ client_monitor_rows|selectattr('is_outdated')|list|length }}</strong>
+          </div>
+        </div>
+
         <div class="table-wrap">
           <table id="admin-clients-table">
             <thead>
@@ -321,7 +340,7 @@
       </article>
     </section>
   </main>
-  <script src="/static/app.js?v=1205" defer></script>
+  <script src="/static/app.js?v=1207" defer></script>
 </body>
 </html>
 

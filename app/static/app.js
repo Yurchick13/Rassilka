@@ -1506,6 +1506,10 @@
   function initAdminPage() {
     const tableBody = document.querySelector("#admin-clients-table tbody");
     const refreshButton = document.getElementById("admin-clients-refresh-btn");
+    const totalCounter = document.getElementById("admin-clients-total");
+    const installedCounter = document.getElementById("admin-clients-installed");
+    const onlineCounter = document.getElementById("admin-clients-online");
+    const outdatedCounter = document.getElementById("admin-clients-outdated");
     if (!tableBody) return;
 
     function formatLastSeen(value) {
@@ -1519,6 +1523,14 @@
 
     function renderClientRows(rows) {
       tableBody.innerHTML = "";
+      const installedCount = rows.filter((row) => row.client_id || row.mac_address || row.hostname).length;
+      const onlineCount = rows.filter((row) => row.is_online).length;
+      const outdatedCount = rows.filter((row) => row.is_outdated).length;
+      if (totalCounter) totalCounter.textContent = String(rows.length);
+      if (installedCounter) installedCounter.textContent = String(installedCount);
+      if (onlineCounter) onlineCounter.textContent = String(onlineCount);
+      if (outdatedCounter) outdatedCounter.textContent = String(outdatedCount);
+
       if (!rows.length) {
         const tr = document.createElement("tr");
         tr.innerHTML = '<td colspan="10" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>';
