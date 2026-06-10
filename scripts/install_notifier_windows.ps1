@@ -149,6 +149,39 @@ function Is-NotifierRunning {
     return $false
 }
 
+function Stop-NotifierProcesses {
+    try {
+        $procs = Get-CimInstance Win32_Process -Filter "Name = 'vacation-notifier.exe' OR Name = 'python.exe' OR Name = 'pythonw.exe' OR Name = 'wscript.exe'"
+        foreach ($proc in $procs) {
+            $matchesNotifier = $false
+            if ($proc.Name -ieq "vacation-notifier.exe") {
+                $matchesNotifier = $true
+            }
+            elseif ($proc.CommandLine -and ($proc.CommandLine -match "VacationNotifier" -or $proc.CommandLine -match "vacation-notifier" -or $proc.CommandLine -match "redos_notifier\\notifier.py")) {
+                $matchesNotifier = $true
+            }
+
+            if ($matchesNotifier) {
+                try {
+                    Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+                }
+                catch {
+                }
+            }
+        }
+    }
+    catch {
+    }
+
+    $deadline = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Is-NotifierRunning)) {
+            return
+        }
+        Start-Sleep -Milliseconds 300
+    }
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $sourceNotifier = Join-Path $projectRoot "redos_notifier"
@@ -160,6 +193,7 @@ if (-not (Test-Path $sourceNotifier)) {
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
 $targetNotifierDir = Join-Path $InstallDir "redos_notifier"
+Stop-NotifierProcesses
 if (Test-Path $targetNotifierDir) {
     Remove-Item -Recurse -Force $targetNotifierDir
 }

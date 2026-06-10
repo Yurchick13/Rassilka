@@ -1442,12 +1442,39 @@ def _normalize_client_hostname(value: str | None) -> str:
     return hostname.split(".", 1)[0]
 
 
-def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeartbeatUpsert) -> ClientHeartbeat:
+def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeartbeatUpsert) -> ClientHeartbeat | None:
     ip_address = _resolve_client_ip(request, payload.ip_address)
-    mac_address = _normalize_mac_address(payload.mac_address)
+    mac_address = _normalize_mac_address(payload.mac_address) or _mac_from_client_id(payload.client_id)
     normalized_hostname = _normalize_client_hostname(payload.hostname)
     now_utc = datetime.now(timezone.utc)
     heartbeat = None
+
+    if not mac_address:
+        no_mac_filter = and_(
+            or_(ClientHeartbeat.mac_address.is_(None), ClientHeartbeat.mac_address == ""),
+            or_(ClientHeartbeat.client_id.is_(None), ~func.lower(ClientHeartbeat.client_id).like("mac-%")),
+        )
+        legacy_filters = [ClientHeartbeat.client_id == payload.client_id]
+        if normalized_hostname:
+            legacy_filters.append(
+                and_(
+                    no_mac_filter,
+                    or_(
+                        func.lower(ClientHeartbeat.hostname) == normalized_hostname,
+                        func.lower(ClientHeartbeat.hostname).like(f"{normalized_hostname}.%"),
+                    ),
+                )
+            )
+        if ip_address:
+            legacy_filters.append(and_(no_mac_filter, ClientHeartbeat.ip_address == ip_address))
+
+        legacy_rows = db.scalars(select(ClientHeartbeat).where(or_(*legacy_filters))).all()
+        for legacy_row in legacy_rows:
+            legacy_mac = _normalize_mac_address(legacy_row.mac_address) or _mac_from_client_id(legacy_row.client_id)
+            if not legacy_mac:
+                db.delete(legacy_row)
+        db.commit()
+        return None
 
     if mac_address:
         heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.mac_address == mac_address))
@@ -1579,6 +1606,11 @@ def _cleanup_client_heartbeat_duplicates(db: Session) -> int:
 
     for row in rows:
         mac_address = _normalize_mac_address(row.mac_address) or _mac_from_client_id(row.client_id)
+        if not mac_address:
+            db.delete(row)
+            deleted_count += 1
+            changed = True
+            continue
         if mac_address and row.mac_address != mac_address:
             row.mac_address = mac_address
             changed = True
@@ -1627,6 +1659,8 @@ def _build_client_monitor_rows(db: Session, *, latest_version: str) -> list[Clie
     seen_fingerprints: set[str] = set()
     for row in rows:
         mac_address = _normalize_mac_address(row.mac_address) or _mac_from_client_id(row.client_id)
+        if not mac_address:
+            continue
         fingerprint = _client_heartbeat_identity(row)
         if fingerprint in seen_fingerprints:
             continue
@@ -1745,7 +1779,7 @@ def upsert_client_heartbeat(
     row = _upsert_client_heartbeat(db, request, payload)
     return ClientHeartbeatResponse(
         status="ok",
-        client_id=row.client_id,
+        client_id=row.client_id if row else payload.client_id,
         server_time=datetime.now(timezone.utc),
     )
 

@@ -69,8 +69,13 @@ EOF
   runtime="/run/user/$uid"
   if [[ -d "$runtime" ]]; then
     run_as_user "$user" env XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" systemctl --user daemon-reload || true
-    run_as_user "$user" env XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" systemctl --user enable --now "$USER_SERVICE_NAME" || true
-    run_as_user "$user" bash -lc "pgrep -f '/opt/vacation-notifier/redos_notifier/notifier.py' >/dev/null || nohup $LAUNCHER >/dev/null 2>&1 &" || true
+    run_as_user "$user" env XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" systemctl --user enable "$USER_SERVICE_NAME" || true
+    if run_as_user "$user" env XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" systemctl --user restart "$USER_SERVICE_NAME"; then
+      return 0
+    fi
+
+    run_as_user "$user" pkill -f '/opt/vacation-notifier/redos_notifier/notifier.py' >/dev/null 2>&1 || true
+    run_as_user "$user" bash -lc "nohup $LAUNCHER >/dev/null 2>&1 &" || true
   fi
 }
 
