@@ -343,24 +343,71 @@ def _read_linux_machine_id() -> str:
     return ""
 
 
+def _normalize_mac_address(value: object) -> str:
+    raw = "".join(ch for ch in str(value or "").lower() if ch in "0123456789abcdef")
+    if len(raw) != 12:
+        return ""
+    if raw == "000000000000" or raw == "ffffffffffff":
+        return ""
+    try:
+        first_octet = int(raw[:2], 16)
+    except ValueError:
+        return ""
+    if first_octet & 1:
+        return ""
+    return ":".join(raw[index : index + 2] for index in range(0, 12, 2))
+
+
+def _read_primary_mac_address() -> str:
+    if os.name != "nt":
+        sys_class_net = Path("/sys/class/net")
+        if sys_class_net.exists():
+            preferred: list[str] = []
+            fallback: list[str] = []
+            for iface in sorted(sys_class_net.iterdir(), key=lambda item: item.name):
+                name = iface.name.lower()
+                if name == "lo" or name.startswith(("docker", "veth", "br-", "virbr", "tun", "tap")):
+                    continue
+                try:
+                    mac = _normalize_mac_address((iface / "address").read_text(encoding="utf-8", errors="ignore"))
+                except Exception:
+                    continue
+                if not mac:
+                    continue
+                try:
+                    operstate = (iface / "operstate").read_text(encoding="utf-8", errors="ignore").strip().lower()
+                except Exception:
+                    operstate = ""
+                if operstate in {"up", "unknown"}:
+                    preferred.append(mac)
+                else:
+                    fallback.append(mac)
+            if preferred or fallback:
+                return (preferred or fallback)[0]
+
+    node = uuid.getnode()
+    if (node >> 40) & 1:
+        return ""
+    return _normalize_mac_address(f"{node:012x}")
+
+
 def _build_stable_client_id() -> str:
     explicit_client_id = os.getenv("NOTIFIER_CLIENT_ID", _FILE_ENV.get("NOTIFIER_CLIENT_ID", "")).strip()
     if explicit_client_id:
         return explicit_client_id[:120]
 
+    mac_address = _read_primary_mac_address()
+    if mac_address:
+        return f"mac-{mac_address.replace(':', '')}"
+
     machine_identity = _read_windows_machine_guid() or _read_linux_machine_id() or CLIENT_HOSTNAME
-    seed = f"vacation-notifier|{machine_identity}|{CLIENT_USERNAME}"
+    seed = f"vacation-notifier|{machine_identity}"
     return f"vn-{uuid.uuid5(uuid.NAMESPACE_DNS, seed)}"
 
 
 def _resolve_client_id(existing_client_id: str | None) -> str:
     preferred = _build_stable_client_id()
     current = str(existing_client_id or "").strip()
-    if not current:
-        return preferred
-    # Migrate legacy random IDs to deterministic ID once to avoid duplicate monitor rows after reinstall.
-    if current.startswith("vn-"):
-        return current
     return preferred
 
 
@@ -668,6 +715,7 @@ class NotifierApp:
             "username": CLIENT_USERNAME,
             "os_name": CLIENT_OS_NAME,
             "os_version": CLIENT_OS_VERSION,
+            "mac_address": _read_primary_mac_address(),
             "mode": "gui" if self._gui_enabled else "headless",
             "last_notification_id": max(0, last_notification_id),
             "update_supported": True,

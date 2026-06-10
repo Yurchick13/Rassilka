@@ -307,6 +307,35 @@ def _ensure_vacation_schema_updates() -> None:
             pass
 
 
+def _ensure_client_heartbeat_schema_updates() -> None:
+    inspector = inspect(engine)
+    try:
+        columns = {column["name"] for column in inspector.get_columns("client_heartbeats")}
+    except Exception:
+        return
+
+    if "mac_address" not in columns:
+        dialect = engine.dialect.name.lower()
+        alter_sql = (
+            "ALTER TABLE client_heartbeats ADD COLUMN IF NOT EXISTS mac_address VARCHAR(32)"
+            if dialect == "postgresql"
+            else "ALTER TABLE client_heartbeats ADD COLUMN mac_address VARCHAR(32)"
+        )
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
+
+    with engine.begin() as conn:
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_client_heartbeats_mac_address "
+                    "ON client_heartbeats (mac_address)"
+                )
+            )
+        except Exception:
+            pass
+
+
 def _current_user_from_session(request: Request, db: Session) -> UserAccount | None:
     raw_id = request.session.get("user_id")
     if not raw_id:
@@ -918,6 +947,7 @@ async def _run_return_deadline_notify() -> None:
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     _ensure_vacation_schema_updates()
+    _ensure_client_heartbeat_schema_updates()
 
     with SessionLocal() as db:
         ensure_default_admin(db)
@@ -1388,10 +1418,29 @@ def _resolve_client_ip(request: Request, payload_ip: str | None = None) -> str:
     return _normalize_text(payload_ip) or ""
 
 
+def _normalize_mac_address(value: str | None) -> str:
+    raw = "".join(ch for ch in str(value or "").lower() if ch in "0123456789abcdef")
+    if len(raw) != 12 or raw in {"000000000000", "ffffffffffff"}:
+        return ""
+    try:
+        first_octet = int(raw[:2], 16)
+    except ValueError:
+        return ""
+    if first_octet & 1:
+        return ""
+    return ":".join(raw[index : index + 2] for index in range(0, 12, 2))
+
+
 def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeartbeatUpsert) -> ClientHeartbeat:
-    heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.client_id == payload.client_id))
     ip_address = _resolve_client_ip(request, payload.ip_address)
+    mac_address = _normalize_mac_address(payload.mac_address)
     now_utc = datetime.now(timezone.utc)
+    heartbeat = None
+
+    if mac_address:
+        heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.mac_address == mac_address))
+    if not heartbeat:
+        heartbeat = db.scalar(select(ClientHeartbeat).where(ClientHeartbeat.client_id == payload.client_id))
 
     if not heartbeat:
         heartbeat = ClientHeartbeat(
@@ -1399,11 +1448,24 @@ def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeart
             created_at=now_utc,
         )
         db.add(heartbeat)
+        db.flush()
+    elif heartbeat.client_id != payload.client_id:
+        conflicting = db.scalar(
+            select(ClientHeartbeat).where(
+                ClientHeartbeat.client_id == payload.client_id,
+                ClientHeartbeat.id != heartbeat.id,
+            )
+        )
+        if conflicting:
+            db.delete(conflicting)
+            db.flush()
+        heartbeat.client_id = payload.client_id
 
     heartbeat.hostname = _normalize_text(payload.hostname)
     heartbeat.username = _normalize_text(payload.username)
     heartbeat.os_name = _normalize_text(payload.os_name)
     heartbeat.os_version = _normalize_text(payload.os_version)
+    heartbeat.mac_address = mac_address or None
     heartbeat.app_version = _normalize_text(payload.app_version)
     heartbeat.app_channel = _normalize_text(payload.app_channel) or "stable"
     heartbeat.ip_address = ip_address or None
@@ -1413,6 +1475,27 @@ def _upsert_client_heartbeat(db: Session, request: Request, payload: ClientHeart
     heartbeat.update_status = _normalize_text(payload.update_status)
     heartbeat.update_error = _normalize_text(payload.update_error)
     heartbeat.last_seen_at = now_utc
+
+    duplicate_filters = []
+    if mac_address:
+        duplicate_filters.append(ClientHeartbeat.mac_address == mac_address)
+    normalized_hostname = _normalize_text(payload.hostname)
+    if mac_address and normalized_hostname:
+        duplicate_filters.append(
+            and_(
+                ClientHeartbeat.mac_address.is_(None),
+                func.lower(ClientHeartbeat.hostname) == normalized_hostname.lower(),
+            )
+        )
+    if duplicate_filters:
+        duplicates = db.scalars(
+            select(ClientHeartbeat).where(
+                ClientHeartbeat.id != heartbeat.id,
+                or_(*duplicate_filters),
+            )
+        ).all()
+        for duplicate in duplicates:
+            db.delete(duplicate)
 
     db.commit()
     db.refresh(heartbeat)
@@ -1435,16 +1518,13 @@ def _build_client_monitor_rows(db: Session, *, latest_version: str) -> list[Clie
     result: list[ClientHeartbeatMonitorResponse] = []
     seen_fingerprints: set[str] = set()
     for row in rows:
-        # Group by stable device identity (host+user+os) to hide stale duplicates
-        # when IP/OS build changes or legacy random client IDs remain in DB.
-        fingerprint = "|".join(
-            [
-                _normalize_text(row.hostname).lower(),
-                _normalize_text(row.username).lower(),
-                _normalize_text(row.os_name).lower(),
-            ]
-        )
-        if not fingerprint.strip("|"):
+        mac_address = _normalize_mac_address(row.mac_address)
+        hostname = _normalize_text(row.hostname).lower()
+        if mac_address:
+            fingerprint = f"mac:{mac_address}"
+        elif hostname:
+            fingerprint = f"host:{hostname}"
+        else:
             fingerprint = f"id:{row.client_id}"
         if fingerprint in seen_fingerprints:
             continue
@@ -1460,6 +1540,7 @@ def _build_client_monitor_rows(db: Session, *, latest_version: str) -> list[Clie
                 username=row.username,
                 os_name=row.os_name,
                 os_version=row.os_version,
+                mac_address=mac_address or row.mac_address,
                 app_version=app_version or "unknown",
                 app_channel=row.app_channel,
                 ip_address=row.ip_address,

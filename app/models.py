@@ -124,6 +124,7 @@ class ClientHeartbeat(Base):
     username: Mapped[str | None] = mapped_column(String(128), nullable=True)
     os_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     os_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    mac_address: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     app_version: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     app_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)

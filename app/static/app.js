@@ -1521,7 +1521,7 @@
       tableBody.innerHTML = "";
       if (!rows.length) {
         const tr = document.createElement("tr");
-        tr.innerHTML = '<td colspan="9" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>';
+        tr.innerHTML = '<td colspan="10" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>';
         tableBody.appendChild(tr);
         return;
       }
@@ -1538,6 +1538,7 @@
 
         tr.innerHTML = `
           <td>${escapeHtml(row.client_id || "—")}</td>
+          <td>${escapeHtml(row.mac_address || "—")}</td>
           <td>${escapeHtml(row.hostname || "—")}</td>
           <td>${escapeHtml(row.username || "—")}</td>
           <td>${escapeHtml(`${row.os_name || "—"} ${row.os_version || ""}`.trim())}</td>

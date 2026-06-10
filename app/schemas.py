@@ -98,6 +98,7 @@ class ClientHeartbeatUpsert(BaseModel):
     username: str | None = Field(default=None, max_length=128)
     os_name: str | None = Field(default=None, max_length=64)
     os_version: str | None = Field(default=None, max_length=128)
+    mac_address: str | None = Field(default=None, max_length=32)
     ip_address: str | None = Field(default=None, max_length=64)
     mode: str | None = Field(default=None, max_length=32)
     last_notification_id: int | None = Field(default=None, ge=0)
@@ -113,6 +114,7 @@ class ClientHeartbeatUpsert(BaseModel):
         "username",
         "os_name",
         "os_version",
+        "mac_address",
         "ip_address",
         "mode",
         "update_status",
@@ -138,6 +140,7 @@ class ClientHeartbeatMonitorResponse(BaseModel):
     username: str | None = None
     os_name: str | None = None
     os_version: str | None = None
+    mac_address: str | None = None
     app_version: str | None = None
     app_channel: str | None = None
     ip_address: str | None = None

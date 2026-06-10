@@ -208,6 +208,7 @@
             <thead>
               <tr>
                 <th>Client ID</th>
+                <th>MAC</th>
                 <th>Хост</th>
                 <th>Пользователь</th>
                 <th>ОС</th>
@@ -222,6 +223,7 @@
               {% for row in client_monitor_rows %}
               <tr>
                 <td>{{ row.client_id }}</td>
+                <td>{{ row.mac_address or '—' }}</td>
                 <td>{{ row.hostname or '—' }}</td>
                 <td>{{ row.username or '—' }}</td>
                 <td>{{ (row.os_name or '—') ~ ' ' ~ (row.os_version or '') }}</td>
@@ -251,7 +253,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="9" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>
+                <td colspan="10" class="empty-cell">Клиенты еще не отправляли heartbeat.</td>
               </tr>
               {% endfor %}
             </tbody>
