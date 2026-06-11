@@ -39,6 +39,10 @@ scripts:
   postinstall: ./packaging/nfpm/scripts/notifier-postinstall.sh
   postremove: ./packaging/nfpm/scripts/notifier-postremove.sh
 
+rpm:
+  scripts:
+    posttrans: ./packaging/nfpm/scripts/notifier-posttrans.sh
+
 overrides:
   deb:
     depends:

@@ -4,6 +4,16 @@ set -euo pipefail
 AUTOSTART_NAME="vacation-notifier.desktop"
 USER_SERVICE_NAME="redos-notifier.service"
 
+# On RPM upgrade the old package postremove is called with argument 1.
+# On DEB upgrade postrm may be called with "upgrade". Do not disable global
+# services in those cases, otherwise the old package breaks the newly installed
+# notifier. Full cleanup is needed only on real erase/remove/purge.
+case "${1:-}" in
+  1|upgrade|failed-upgrade|abort-upgrade|disappear)
+    exit 0
+    ;;
+esac
+
 run_as_user() {
   local user="$1"
   shift
@@ -16,13 +26,19 @@ run_as_user() {
 
 cleanup_user_session() {
   local user="$1"
-  local uid home runtime
+  local uid home runtime had_legacy_config=0
 
   uid="$(id -u "$user" 2>/dev/null || true)"
   home="$(getent passwd "$user" 2>/dev/null | cut -d: -f6 || true)"
 
   [[ -n "$uid" ]] || return 0
   [[ -n "$home" && -d "$home" ]] || return 0
+
+  if [[ -e "$home/.config/systemd/user/default.target.wants/$USER_SERVICE_NAME" \
+        || -e "$home/.config/systemd/user/$USER_SERVICE_NAME" \
+        || -e "$home/.config/autostart/$AUTOSTART_NAME" ]]; then
+    had_legacy_config=1
+  fi
 
   runtime="/run/user/$uid"
   if [[ -d "$runtime" ]]; then
@@ -32,6 +48,10 @@ cleanup_user_session() {
   rm -f "$home/.config/autostart/$AUTOSTART_NAME" \
         "$home/.config/systemd/user/$USER_SERVICE_NAME" \
         "$home/.config/systemd/user/default.target.wants/$USER_SERVICE_NAME"
+
+  if [[ "$had_legacy_config" == "1" && -e "/var/lib/systemd/linger/$user" ]] && command -v loginctl >/dev/null 2>&1; then
+    loginctl disable-linger "$user" >/dev/null 2>&1 || true
+  fi
 }
 
 mapfile -t _users < <(getent passwd | awk -F: '$3>=1000 && $7 !~ /(false|nologin)$/ {print $1}' | sort -u || true)

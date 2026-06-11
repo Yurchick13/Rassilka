@@ -99,10 +99,9 @@ if [[ "${EUID}" -eq 0 ]]; then
   chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config" "$TARGET_HOME/.local" || true
   chown -h "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/systemd/user/default.target.wants/redos-notifier.service" || true
   chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.local/bin/vacation-notifier" "$TARGET_HOME/.local/share/applications/vacation-notifier.desktop" "$TARGET_HOME/.config/autostart/vacation-notifier.desktop" "$TARGET_HOME/.config/systemd/user/redos-notifier.service" "$INSTALL_DIR/.env"
-fi
-
-if command -v loginctl >/dev/null 2>&1 && [[ "${EUID}" -eq 0 ]]; then
-  loginctl enable-linger "$TARGET_USER" >/dev/null 2>&1 || true
+  if command -v loginctl >/dev/null 2>&1 && [[ -e "/var/lib/systemd/linger/$TARGET_USER" ]]; then
+    loginctl disable-linger "$TARGET_USER" >/dev/null 2>&1 || true
+  fi
 fi
 
 USER_UID="$(id -u "$TARGET_USER")"
