@@ -66,9 +66,6 @@ cleanup_legacy_user_session() {
 
   if [[ "$had_legacy_config" == "1" && -e "/var/lib/systemd/linger/$user" ]] && command -v loginctl >/dev/null 2>&1; then
     loginctl disable-linger "$user" >/dev/null 2>&1 || true
-    if ! user_has_session "$user"; then
-      loginctl terminate-user "$user" >/dev/null 2>&1 || true
-    fi
   fi
 }
 
