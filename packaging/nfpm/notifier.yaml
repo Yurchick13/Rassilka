@@ -34,6 +34,14 @@ contents:
     dst: /etc/xdg/autostart/vacation-notifier.desktop
   - src: ./dist/staging/notifier/etc/vacation-notifier.env.example
     dst: /etc/vacation-notifier.env.example
+  - src: ./packaging/templates/polkit/49-vacation-notifier-local-power.rules
+    dst: /etc/polkit-1/rules.d/49-vacation-notifier-local-power.rules
+    file_info:
+      mode: 0644
+  - src: ./packaging/templates/polkit-localauthority/49-vacation-notifier-local-power.pkla
+    dst: /etc/polkit-1/localauthority/50-local.d/49-vacation-notifier-local-power.pkla
+    file_info:
+      mode: 0644
 
 scripts:
   postinstall: ./packaging/nfpm/scripts/notifier-postinstall.sh

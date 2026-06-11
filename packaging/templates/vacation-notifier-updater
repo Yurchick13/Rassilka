@@ -122,7 +122,16 @@ with open(out_file, 'wb') as fh:
 PY
 
 if [[ "$UPDATE_URL" == *.rpm ]]; then
-  rpm -Uvh --replacepkgs "$TMP_FILE"
+  rpm -Uvh --replacepkgs --replacefiles "$TMP_FILE"
+
+  # Some old RED OS installs ended up with several package NEVRAs at once.
+  # Keep only the just-installed target version so future updates are clean.
+  while IFS= read -r installed_pkg; do
+    [[ -n "$installed_pkg" ]] || continue
+    if [[ "$installed_pkg" != "vacation-registry-notifier-${TARGET_VERSION}-"* ]]; then
+      rpm -e --noscripts --nodeps "$installed_pkg" >/dev/null 2>&1 || true
+    fi
+  done < <(rpm -qa | grep '^vacation-registry-notifier-' | sort || true)
 elif [[ "$UPDATE_URL" == *.deb ]]; then
   dpkg -i "$TMP_FILE"
 else

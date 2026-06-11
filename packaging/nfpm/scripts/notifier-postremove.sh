@@ -3,6 +3,8 @@ set -euo pipefail
 
 AUTOSTART_NAME="vacation-notifier.desktop"
 USER_SERVICE_NAME="redos-notifier.service"
+POLKIT_RULE="/etc/polkit-1/rules.d/49-vacation-notifier-local-power.rules"
+POLKIT_PKLA="/etc/polkit-1/localauthority/50-local.d/49-vacation-notifier-local-power.pkla"
 
 # On RPM upgrade the old package postremove is called with argument 1.
 # On DEB upgrade postrm may be called with "upgrade". Do not disable global
@@ -68,4 +70,6 @@ systemctl stop vacation-notifier-updater.service >/dev/null 2>&1 || true
 systemctl daemon-reload >/dev/null 2>&1 || true
 rm -f /etc/xdg/autostart/vacation-notifier.desktop >/dev/null 2>&1 || true
 rm -f /usr/share/applications/vacation-notifier.desktop >/dev/null 2>&1 || true
+rm -f "$POLKIT_RULE" "$POLKIT_PKLA" >/dev/null 2>&1 || true
+systemctl try-reload-or-restart polkit.service >/dev/null 2>&1 || systemctl try-reload-or-restart polkit >/dev/null 2>&1 || true
 update-desktop-database >/dev/null 2>&1 || true

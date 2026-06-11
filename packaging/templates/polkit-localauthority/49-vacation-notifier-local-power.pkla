@@ -1,0 +1,4 @@
+﻿[Allow local workstation users to power off with other sessions]
+Identity=unix-user:*
+Action=org.freedesktop.login1.power-off;org.freedesktop.login1.power-off-multiple-sessions;org.freedesktop.login1.power-off-ignore-inhibit;org.freedesktop.login1.reboot;org.freedesktop.login1.reboot-multiple-sessions;org.freedesktop.login1.reboot-ignore-inhibit;org.freedesktop.login1.halt;org.freedesktop.login1.halt-multiple-sessions;org.freedesktop.login1.halt-ignore-inhibit
+ResultActive=yes

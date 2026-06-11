@@ -1,0 +1,20 @@
+﻿// Allow a person sitting at the workstation to power off/reboot it even when
+// another user still has an SSH or stale session. This prevents RED OS from
+// asking for mradmin's password when medic shuts down a shared workstation.
+polkit.addRule(function(action, subject) {
+    var allowedActions = [
+        "org.freedesktop.login1.power-off",
+        "org.freedesktop.login1.power-off-multiple-sessions",
+        "org.freedesktop.login1.power-off-ignore-inhibit",
+        "org.freedesktop.login1.reboot",
+        "org.freedesktop.login1.reboot-multiple-sessions",
+        "org.freedesktop.login1.reboot-ignore-inhibit",
+        "org.freedesktop.login1.halt",
+        "org.freedesktop.login1.halt-multiple-sessions",
+        "org.freedesktop.login1.halt-ignore-inhibit"
+    ];
+
+    if (allowedActions.indexOf(action.id) >= 0 && subject.active && subject.local) {
+        return polkit.Result.YES;
+    }
+});

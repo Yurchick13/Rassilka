@@ -69,6 +69,7 @@ restart_user_session() {
 }
 
 systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl try-reload-or-restart polkit.service >/dev/null 2>&1 || systemctl try-reload-or-restart polkit >/dev/null 2>&1 || true
 systemctl --global enable "$USER_SERVICE_NAME" >/dev/null 2>&1 || true
 systemctl enable --now vacation-notifier-updater.timer >/dev/null 2>&1 || true
 

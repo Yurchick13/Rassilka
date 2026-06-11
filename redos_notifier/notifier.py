@@ -907,7 +907,7 @@ class NotifierApp:
             install_cmd = ["dpkg", "-i"]
         elif update_url.endswith(".rpm"):
             suffix = ".rpm"
-            install_cmd = ["rpm", "-Uvh", "--replacepkgs"]
+            install_cmd = ["rpm", "-Uvh", "--replacepkgs", "--replacefiles"]
         else:
             self._set_update_state("update_failed", "Неподдерживаемый формат Linux-пакета.")
             return
@@ -917,6 +917,8 @@ class NotifierApp:
         self._set_update_state("installing")
         try:
             subprocess.run(install_cmd + [str(pkg_path)], check=True)
+            if suffix == ".rpm":
+                self._cleanup_old_linux_rpm_versions(target_version)
         finally:
             try:
                 pkg_path.unlink(missing_ok=True)
@@ -927,6 +929,37 @@ class NotifierApp:
             self._state["last_update_target_version"] = target_version
             self._save_state(self._state)
         LOGGER.info("Linux package updated to %s", target_version)
+
+    def _cleanup_old_linux_rpm_versions(self, target_version: str) -> None:
+        target_version = str(target_version or "").strip()
+        if not target_version:
+            return
+        try:
+            result = subprocess.run(
+                ["rpm", "-qa"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except Exception as exc:
+            LOGGER.debug("Cannot list RPM packages for cleanup: %s", exc)
+            return
+
+        for raw_name in (result.stdout or "").splitlines():
+            package_name = raw_name.strip()
+            if not package_name.startswith("vacation-registry-notifier-"):
+                continue
+            if package_name.startswith(f"vacation-registry-notifier-{target_version}-"):
+                continue
+            try:
+                subprocess.run(
+                    ["rpm", "-e", "--noscripts", "--nodeps", package_name],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as exc:
+                LOGGER.debug("Cannot remove old RPM package %s: %s", package_name, exc)
 
     def _check_for_updates(self) -> None:
         if not AUTO_UPDATE_ENABLED:
